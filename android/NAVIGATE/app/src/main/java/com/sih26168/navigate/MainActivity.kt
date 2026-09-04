@@ -14,9 +14,12 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import android.os.SystemClock
+import android.util.Log
 import com.sih26168.navigate.databinding.ActivityMainBinding
 import com.sih26168.navigate.helper.ImuHelper
 import com.sih26168.navigate.helper.LocationHelper
+import com.sih26168.navigate.helper.OnnxInferenceHelper
 import com.sih26168.navigate.service.GeocodingService
 import com.sih26168.navigate.service.RoutingService
 import kotlinx.coroutines.launch
@@ -26,12 +29,18 @@ import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var locationHelper: LocationHelper
     private lateinit var imuHelper: ImuHelper
+    private lateinit var onnxInferenceHelper: OnnxInferenceHelper
+
+    private val inferenceExecutor = Executors.newSingleThreadExecutor()
+    private val isInferenceRunning = AtomicBoolean(false)
 
     private var currentGeoPoint: GeoPoint? = null
     private var destinationGeoPoint: GeoPoint? = null
@@ -41,6 +50,13 @@ class MainActivity : AppCompatActivity() {
     private var routePolyline: Polyline? = null
 
     private var isMapCenteredOnFirstFix = false
+
+    // AI Inference Diagnostics
+    private var lastProcessedSampleCount = -1L
+    private var inferenceCount = 0
+    private var lastAiRateCalcTimeMs = 0L
+    private var currentAiRateHz = 0.0
+    private var lastAiLogTimeMs = 0L
 
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
@@ -64,6 +80,8 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        onnxInferenceHelper = OnnxInferenceHelper(this)
+
         setupMapView()
         setupListeners()
         setupLocationHelper()
@@ -73,10 +91,90 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupImuHelper() {
-        imuHelper = ImuHelper(this) { statusText, _, sampleRateHz, _ ->
+        imuHelper = ImuHelper(this) { statusText, isReady, sampleRateHz, _ ->
             runOnUiThread {
                 binding.tvImuStatus.text = statusText
                 binding.tvImuRate.text = if (sampleRateHz > 0) String.format("%.1f Hz", sampleRateHz) else "Rate: -- Hz"
+
+                if (!isReady) {
+                    binding.tvAiStatus.text = "AI: Waiting for IMU"
+                }
+            }
+
+            if (isReady && onnxInferenceHelper.isInitialized()) {
+                val currentSampleCount = imuHelper.imuBuffer.getTotalSampleCount()
+                if (currentSampleCount > lastProcessedSampleCount) {
+                    lastProcessedSampleCount = currentSampleCount
+                    triggerAiInference()
+                }
+            }
+        }
+    }
+
+    private fun triggerAiInference() {
+        if (!isInferenceRunning.compareAndSet(false, true)) {
+            // Drop redundant trigger if previous inference is still executing
+            return
+        }
+
+        val window = imuHelper.imuBuffer.getWindow()
+        if (window.size != 50) {
+            isInferenceRunning.set(false)
+            return
+        }
+
+        inferenceExecutor.execute {
+            try {
+                val res = onnxInferenceHelper.runInference(window)
+                val nowMs = SystemClock.elapsedRealtime()
+
+                // Calculate AI Inference Rate (Hz)
+                inferenceCount++
+                if (lastAiRateCalcTimeMs == 0L) {
+                    lastAiRateCalcTimeMs = nowMs
+                } else {
+                    val elapsedMs = nowMs - lastAiRateCalcTimeMs
+                    if (elapsedMs >= 1000L) {
+                        currentAiRateHz = (inferenceCount.toDouble() * 1000.0) / elapsedMs.toDouble()
+                        inferenceCount = 0
+                        lastAiRateCalcTimeMs = nowMs
+                    }
+                }
+
+                // Periodic diagnostic logging ~once per second
+                if (nowMs - lastAiLogTimeMs >= 1000L) {
+                    lastAiLogTimeMs = nowMs
+                    Log.d(
+                        "MainActivity",
+                        String.format(
+                            "AI velocity: %.2f m/s | AI quaternion: [%.3f, %.3f, %.3f, %.3f] (norm=%.4f) | AI inference: %.1f Hz | latency: %d ms",
+                            res.speedMs,
+                            res.quaternion[0], res.quaternion[1], res.quaternion[2], res.quaternion[3],
+                            res.quatNorm,
+                            currentAiRateHz,
+                            res.latencyMs
+                        )
+                    )
+                }
+
+                // Update UI elements on main thread
+                runOnUiThread {
+                    binding.tvAiStatus.text = "AI: Inference ready"
+                    binding.tvAiVelocity.text = String.format("Velocity: %.2f m/s", res.speedMs)
+                    binding.tvAiAttitude.text = String.format(
+                        "Attitude: [%.3f, %.3f, %.3f, %.3f]",
+                        res.quaternion[0], res.quaternion[1], res.quaternion[2], res.quaternion[3]
+                    )
+                    binding.tvAiRate.text = if (currentAiRateHz > 0) {
+                        String.format("Inference rate: %.1f Hz (%d ms)", currentAiRateHz, res.latencyMs)
+                    } else {
+                        String.format("Inference latency: %d ms", res.latencyMs)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error during AI inference: ${e.message}", e)
+            } finally {
+                isInferenceRunning.set(false)
             }
         }
     }
@@ -277,5 +375,13 @@ class MainActivity : AppCompatActivity() {
         binding.mapView.onPause()
         locationHelper.stopLocationUpdates()
         imuHelper.stop()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        inferenceExecutor.shutdown()
+        if (::onnxInferenceHelper.isInitialized) {
+            onnxInferenceHelper.close()
+        }
     }
 }

@@ -44,6 +44,7 @@ class ImuBuffer(
 
     // Diagnostic metrics
     private var generatedSampleCount = 0
+    private var totalSynchronizedSamples = 0L
     private var lastRateCalcTimeNs = -1L
     private var currentRateHz = 0.0
 
@@ -119,6 +120,7 @@ class ImuBuffer(
 
             // Rate tracking
             generatedSampleCount++
+            totalSynchronizedSamples++
             if (lastRateCalcTimeNs < 0) {
                 lastRateCalcTimeNs = nextTargetTimestampNs
             } else {
@@ -187,6 +189,11 @@ class ImuBuffer(
     }
 
     @Synchronized
+    fun getTotalSampleCount(): Long {
+        return totalSynchronizedSamples
+    }
+
+    @Synchronized
     fun clear() {
         accelQueue.clear()
         gyroQueue.clear()
@@ -194,6 +201,7 @@ class ImuBuffer(
         nextTargetTimestampNs = -1L
         isInitialized = false
         generatedSampleCount = 0
+        totalSynchronizedSamples = 0L
         lastRateCalcTimeNs = -1L
         currentRateHz = 0.0
     }

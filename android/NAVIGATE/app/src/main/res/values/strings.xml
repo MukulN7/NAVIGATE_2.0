@@ -13,4 +13,9 @@
     <string name="mode_gnss">Mode: GNSS</string>
     <string name="imu_status_init">IMU: Initializing</string>
     <string name="imu_rate_placeholder">Rate: -- Hz</string>
+    <string name="ai_status_waiting">AI: Waiting for IMU</string>
+    <string name="ai_status_ready">AI: Inference ready</string>
+    <string name="ai_velocity_placeholder">Velocity: -- m/s</string>
+    <string name="ai_attitude_placeholder">Attitude: --</string>
+    <string name="ai_rate_placeholder">Inference rate: -- Hz</string>
 </resources>

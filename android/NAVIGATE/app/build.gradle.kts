@@ -46,5 +46,7 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("org.osmdroid:osmdroid-android:6.1.18")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.18.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.microsoft.onnxruntime:onnxruntime:1.18.0")
 }
