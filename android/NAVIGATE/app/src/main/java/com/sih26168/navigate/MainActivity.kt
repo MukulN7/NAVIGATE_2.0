@@ -24,7 +24,9 @@ import com.sih26168.navigate.helper.GnssState
 import com.sih26168.navigate.helper.ImuHelper
 import com.sih26168.navigate.helper.LocationHelper
 import com.sih26168.navigate.helper.OnnxInferenceHelper
+import com.sih26168.navigate.helper.RouteProgressHelper
 import com.sih26168.navigate.service.GeocodingService
+import com.sih26168.navigate.service.RouteResult
 import com.sih26168.navigate.service.RoutingService
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
@@ -54,6 +56,7 @@ class MainActivity : AppCompatActivity() {
     private var currentLocationMarker: Marker? = null
     private var destinationMarker: Marker? = null
     private var routePolyline: Polyline? = null
+    private var activeRouteResult: RouteResult? = null
 
     private var isMapCenteredOnFirstFix = false
 
@@ -205,31 +208,40 @@ class MainActivity : AppCompatActivity() {
                             lastEkfLogTimeMs = nowMs
                             val posEnu = if (esEkf.isInitialized()) esEkf.getPosEnu() else doubleArrayOf(0.0, 0.0, 0.0)
                             val velEnu = if (esEkf.isInitialized()) esEkf.getVelEnu() else doubleArrayOf(0.0, 0.0, 0.0)
+                            val (lat, lon, _) = if (esEkf.isInitialized()) esEkf.getLatLonAlt() else Triple(0.0, 0.0, 0.0)
 
-                            if (gnssOutageManager.isOutageActive()) {
+                            val isOutage = gnssOutageManager.isOutageActive()
+                            val route = activeRouteResult
+                            val progressStr = if (route != null && route.points.isNotEmpty()) {
+                                val prog = RouteProgressHelper.calculateProgress(GeoPoint(lat, lon), route.points, route.distanceMeters)
+                                prog.formattedProgress
+                            } else "No active route"
+
+                            if (isOutage) {
                                 val elapsedSec = (nowMs - gnssOutageManager.outageStartTimeMs) / 1000.0
-                                val (lat, lon, _) = if (esEkf.isInitialized()) esEkf.getLatLonAlt() else Triple(0.0, 0.0, 0.0)
                                 Log.d(
                                     "MainActivity",
                                     String.format(
-                                        "GNSS OUTAGE ACTIVE (%.1fs) | Lat: %.6f, Lon: %.6f | vel ENU: [%.2f, %.2f, %.2f] | speed: %.2f m/s | skipped updates: %d",
+                                        "GNSS OUTAGE ACTIVE (%.1fs) | Marker Source: ES-EKF | Lat: %.6f, Lon: %.6f | vel ENU: [%.2f, %.2f, %.2f] | speed: %.2f m/s | skipped updates: %d | %s",
                                         elapsedSec, lat, lon, velEnu[0], velEnu[1], velEnu[2],
                                         if (esEkf.isInitialized()) esEkf.getSpeedMs() else 0.0,
-                                        gnssOutageManager.skippedUpdateCount
+                                        gnssOutageManager.skippedUpdateCount,
+                                        progressStr
                                     )
                                 )
                             } else {
                                 Log.d(
                                     "MainActivity",
                                     String.format(
-                                        "ES-EKF active | pos ENU: [%.2f, %.2f, %.2f] | vel ENU: [%.2f, %.2f, %.2f] | speed: %.2f m/s | heading: %.1f° | GNSS: %s | AI speed: %.2f m/s | rate: %.1f Hz",
+                                        "ES-EKF active | Marker Source: ES-EKF | pos ENU: [%.2f, %.2f, %.2f] | vel ENU: [%.2f, %.2f, %.2f] | speed: %.2f m/s | heading: %.1f° | GNSS: %s | AI speed: %.2f m/s | rate: %.1f Hz | %s",
                                         posEnu[0], posEnu[1], posEnu[2],
                                         velEnu[0], velEnu[1], velEnu[2],
                                         if (esEkf.isInitialized()) esEkf.getSpeedMs() else 0.0,
                                         if (esEkf.isInitialized()) esEkf.getHeadingDeg() else 0.0,
                                         gnssOutageManager.currentState.name,
                                         res.speedMs,
-                                        currentAiRateHz
+                                        currentAiRateHz,
+                                        progressStr
                                     )
                                 )
                             }
@@ -281,6 +293,15 @@ class MainActivity : AppCompatActivity() {
             binding.mapView.overlays.add(currentLocationMarker)
         } else {
             currentLocationMarker?.position = ekfGeoPoint
+        }
+
+        val isOutage = gnssOutageManager.isOutageActive()
+        binding.tvMarkerSource.text = if (isOutage) "Marker: ES-EKF (Outage)" else "Marker: ES-EKF Estimate"
+
+        val currentRoute = activeRouteResult
+        if (currentRoute != null && currentRoute.points.isNotEmpty()) {
+            val prog = RouteProgressHelper.calculateProgress(ekfGeoPoint, currentRoute.points, currentRoute.distanceMeters)
+            binding.tvRouteProgress.text = prog.formattedProgress
         }
 
         if (!isMapCenteredOnFirstFix) {
@@ -466,6 +487,7 @@ class MainActivity : AppCompatActivity() {
                     return@launch
                 }
 
+                activeRouteResult = routeResult
                 if (routePolyline != null) {
                     binding.mapView.overlays.remove(routePolyline)
                 }
@@ -480,6 +502,14 @@ class MainActivity : AppCompatActivity() {
 
                 binding.tvRouteDistance.text = "Distance: ${routeResult.getFormattedDistance()}"
                 binding.tvRouteEta.text = "ETA: ${routeResult.getFormattedDuration()}"
+
+                val initialProg = RouteProgressHelper.calculateProgress(startPoint, routeResult.points, routeResult.distanceMeters)
+                binding.tvRouteProgress.text = initialProg.formattedProgress
+
+                Log.d(
+                    "MainActivity",
+                    "Route created | Destination: $destText | Distance: ${routeResult.getFormattedDistance()} | ETA: ${routeResult.getFormattedDuration()} | Points: ${routeResult.points.size}"
+                )
 
                 val boundingBox = BoundingBox.fromGeoPoints(routeResult.points)
                 binding.mapView.zoomToBoundingBox(boundingBox, true, 80)

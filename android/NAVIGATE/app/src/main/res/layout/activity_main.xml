@@ -298,6 +298,33 @@
 
             </LinearLayout>
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="4dp">
+
+                <TextView
+                    android:id="@+id/tvRouteProgress"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/route_progress_placeholder"
+                    android:textColor="@color/accent_green"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvMarkerSource"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/marker_source_placeholder"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:textStyle="italic" />
+
+            </LinearLayout>
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnToggleGnssOutage"
                 android:layout_width="match_parent"
