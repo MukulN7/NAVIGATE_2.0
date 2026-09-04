@@ -19,6 +19,8 @@ import androidx.lifecycle.lifecycleScope
 import com.sih26168.navigate.databinding.ActivityMainBinding
 import com.sih26168.navigate.helper.EsEkf
 import com.sih26168.navigate.helper.EsEkfMath
+import com.sih26168.navigate.helper.GnssOutageManager
+import com.sih26168.navigate.helper.GnssState
 import com.sih26168.navigate.helper.ImuHelper
 import com.sih26168.navigate.helper.LocationHelper
 import com.sih26168.navigate.helper.OnnxInferenceHelper
@@ -41,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var imuHelper: ImuHelper
     private lateinit var onnxInferenceHelper: OnnxInferenceHelper
     private val esEkf = EsEkf()
+    private val gnssOutageManager = GnssOutageManager()
 
     private val navigationExecutor = Executors.newSingleThreadExecutor()
     private val isInferenceRunning = AtomicBoolean(false)
@@ -203,18 +206,33 @@ class MainActivity : AppCompatActivity() {
                             val posEnu = if (esEkf.isInitialized()) esEkf.getPosEnu() else doubleArrayOf(0.0, 0.0, 0.0)
                             val velEnu = if (esEkf.isInitialized()) esEkf.getVelEnu() else doubleArrayOf(0.0, 0.0, 0.0)
 
-                            Log.d(
-                                "MainActivity",
-                                String.format(
-                                    "ES-EKF active | pos ENU: [%.2f, %.2f, %.2f] | vel ENU: [%.2f, %.2f, %.2f] | speed: %.2f m/s | heading: %.1f° | GNSS: FIX | AI speed: %.2f m/s | rate: %.1f Hz",
-                                    posEnu[0], posEnu[1], posEnu[2],
-                                    velEnu[0], velEnu[1], velEnu[2],
-                                    if (esEkf.isInitialized()) esEkf.getSpeedMs() else 0.0,
-                                    if (esEkf.isInitialized()) esEkf.getHeadingDeg() else 0.0,
-                                    res.speedMs,
-                                    currentAiRateHz
+                            if (gnssOutageManager.isOutageActive()) {
+                                val elapsedSec = (nowMs - gnssOutageManager.outageStartTimeMs) / 1000.0
+                                val (lat, lon, _) = if (esEkf.isInitialized()) esEkf.getLatLonAlt() else Triple(0.0, 0.0, 0.0)
+                                Log.d(
+                                    "MainActivity",
+                                    String.format(
+                                        "GNSS OUTAGE ACTIVE (%.1fs) | Lat: %.6f, Lon: %.6f | vel ENU: [%.2f, %.2f, %.2f] | speed: %.2f m/s | skipped updates: %d",
+                                        elapsedSec, lat, lon, velEnu[0], velEnu[1], velEnu[2],
+                                        if (esEkf.isInitialized()) esEkf.getSpeedMs() else 0.0,
+                                        gnssOutageManager.skippedUpdateCount
+                                    )
                                 )
-                            )
+                            } else {
+                                Log.d(
+                                    "MainActivity",
+                                    String.format(
+                                        "ES-EKF active | pos ENU: [%.2f, %.2f, %.2f] | vel ENU: [%.2f, %.2f, %.2f] | speed: %.2f m/s | heading: %.1f° | GNSS: %s | AI speed: %.2f m/s | rate: %.1f Hz",
+                                        posEnu[0], posEnu[1], posEnu[2],
+                                        velEnu[0], velEnu[1], velEnu[2],
+                                        if (esEkf.isInitialized()) esEkf.getSpeedMs() else 0.0,
+                                        if (esEkf.isInitialized()) esEkf.getHeadingDeg() else 0.0,
+                                        gnssOutageManager.currentState.name,
+                                        res.speedMs,
+                                        currentAiRateHz
+                                    )
+                                )
+                            }
                         }
 
                         // Update UI on main thread
@@ -296,6 +314,26 @@ class MainActivity : AppCompatActivity() {
                 false
             }
         }
+
+        binding.btnToggleGnssOutage.setOnClickListener {
+            if (gnssOutageManager.isOutageActive()) {
+                // Restore GNSS
+                gnssOutageManager.startRecovery()
+                Log.d("MainActivity", "GNSS RECOVERY START")
+                binding.btnToggleGnssOutage.text = getString(R.string.btn_simulate_gnss_outage)
+                binding.btnToggleGnssOutage.setBackgroundColor(Color.parseColor("#DC2626"))
+                binding.tvGpsStatus.text = getString(R.string.gps_status_recovering)
+                binding.tvGpsStatus.setTextColor(Color.parseColor("#F59E0B"))
+            } else {
+                // Start Outage
+                gnssOutageManager.startOutage(SystemClock.elapsedRealtime())
+                Log.d("MainActivity", "GNSS OUTAGE START")
+                binding.btnToggleGnssOutage.text = getString(R.string.btn_restore_gnss)
+                binding.btnToggleGnssOutage.setBackgroundColor(Color.parseColor("#16A34A"))
+                binding.tvGpsStatus.text = getString(R.string.gps_status_outage)
+                binding.tvGpsStatus.setTextColor(Color.parseColor("#EF4444"))
+            }
+        }
     }
 
     private fun setupLocationHelper() {
@@ -305,7 +343,9 @@ class MainActivity : AppCompatActivity() {
                 handleLocationUpdate(location)
             },
             onStatusChanged = { statusText ->
-                binding.tvGpsStatus.text = statusText
+                if (!gnssOutageManager.isOutageActive() && gnssOutageManager.currentState != GnssState.RECOVERING) {
+                    binding.tvGpsStatus.text = statusText
+                }
             }
         )
     }
@@ -317,18 +357,57 @@ class MainActivity : AppCompatActivity() {
             if (!esEkf.isInitialized()) {
                 esEkf.initialize(location.latitude, location.longitude, location.altitude, nowSec)
                 Log.d("MainActivity", "ES-EKF Initialized at Lat: ${location.latitude}, Lon: ${location.longitude}")
-            } else {
-                val posEnuMeas = EsEkfMath.latLonToEnu(
-                    location.latitude,
-                    location.longitude,
-                    esEkf.getLatLonAlt().first,
-                    esEkf.getLatLonAlt().second
-                )
-                esEkf.updateGnssPosition(posEnuMeas)
+                Log.d("MainActivity", "GNSS FIX")
+                runOnUiThread {
+                    binding.tvGpsStatus.text = getString(R.string.gps_status_fix)
+                    binding.tvGpsStatus.setTextColor(ContextCompat.getColor(this, R.color.accent_green))
+                    binding.tvNavigationMode.text = "Navigation: ES-EKF ACTIVE"
+                    updateMapVehicleMarker()
+                }
+                return@execute
+            }
+
+            if (!gnssOutageManager.gnssUpdatesEnabled.get()) {
+                gnssOutageManager.onGnssUpdateSkipped()
+                Log.d("MainActivity", "GNSS UPDATE SKIPPED")
+                return@execute
+            }
+
+            val posEnuMeas = EsEkfMath.latLonToEnu(
+                location.latitude,
+                location.longitude,
+                esEkf.getLatLonAlt().first,
+                esEkf.getLatLonAlt().second
+            )
+            esEkf.updateGnssPosition(posEnuMeas)
+
+            val isRecoveryUpdate = (gnssOutageManager.currentState == GnssState.RECOVERING)
+            gnssOutageManager.onGnssUpdateApplied()
+
+            if (isRecoveryUpdate) {
+                Log.d("MainActivity", "GNSS UPDATE APPLIED")
+                Log.d("MainActivity", "GNSS RECOVERED")
             }
 
             runOnUiThread {
-                binding.tvGpsStatus.text = "GNSS: FIX"
+                when (gnssOutageManager.currentState) {
+                    GnssState.OUTAGE -> {
+                        binding.tvGpsStatus.text = getString(R.string.gps_status_outage)
+                        binding.tvGpsStatus.setTextColor(Color.parseColor("#EF4444"))
+                    }
+                    GnssState.RECOVERING -> {
+                        binding.tvGpsStatus.text = getString(R.string.gps_status_recovering)
+                        binding.tvGpsStatus.setTextColor(Color.parseColor("#F59E0B"))
+                    }
+                    GnssState.RECOVERED -> {
+                        binding.tvGpsStatus.text = getString(R.string.gps_status_recovered)
+                        binding.tvGpsStatus.setTextColor(ContextCompat.getColor(this, R.color.accent_green))
+                    }
+                    else -> {
+                        binding.tvGpsStatus.text = getString(R.string.gps_status_fix)
+                        binding.tvGpsStatus.setTextColor(ContextCompat.getColor(this, R.color.accent_green))
+                    }
+                }
                 binding.tvNavigationMode.text = "Navigation: ES-EKF ACTIVE"
                 updateMapVehicleMarker()
             }

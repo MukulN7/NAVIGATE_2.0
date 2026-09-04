@@ -21,4 +21,10 @@
     <string name="ai_velocity_placeholder">Velocity: -- m/s</string>
     <string name="ai_attitude_placeholder">Attitude: --</string>
     <string name="ai_rate_placeholder">Inference rate: -- Hz</string>
+    <string name="btn_simulate_gnss_outage">SIMULATE GNSS OUTAGE</string>
+    <string name="btn_restore_gnss">RESTORE GNSS</string>
+    <string name="gps_status_fix">GNSS: FIX</string>
+    <string name="gps_status_outage">GNSS: OUTAGE — AI + ES-EKF</string>
+    <string name="gps_status_recovering">GNSS: RECOVERING</string>
+    <string name="gps_status_recovered">GNSS: RECOVERED</string>
 </resources>

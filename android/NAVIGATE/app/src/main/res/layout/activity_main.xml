@@ -298,6 +298,18 @@
 
             </LinearLayout>
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnToggleGnssOutage"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="10dp"
+                android:text="@string/btn_simulate_gnss_outage"
+                android:textColor="@color/text_light"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                app:backgroundTint="#DC2626"
+                app:cornerRadius="10dp" />
+
         </LinearLayout>
 
     </com.google.android.material.card.MaterialCardView>
