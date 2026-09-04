@@ -1,0 +1,373 @@
+{
+  "metadata": {
+    "model_checkpoint": "models\\velocity_model_v2.pt",
+    "dataset_npz": "data\\processed\\iovnbd_full.npz",
+    "evaluated_test_sessions": [
+      "S-M",
+      "S-Vfa01",
+      "S-Vw2"
+    ],
+    "blackout_durations_s": [
+      5,
+      10,
+      30,
+      60
+    ],
+    "runtime_seconds": 2.81,
+    "limitations_and_assumptions": [
+      "Baseline navigation uses VelocityModel V2 forward speed estimates + Gyroscope integration (no IEKF / map matching).",
+      "GNSS blackout intervals are generated deterministically across test session timelines.",
+      "Vehicle ground-truth lat/lon/heading is aligned with window end sample indices."
+    ]
+  },
+  "overall_mean_by_duration": {
+    "5s": {
+      "final_position_error_m": 37.505,
+      "max_position_error_m": 37.799,
+      "rmse_position_error_m": 24.903,
+      "traveled_distance_m": 69.528,
+      "relative_drift_percent": 54.069
+    },
+    "10s": {
+      "final_position_error_m": 71.666,
+      "max_position_error_m": 71.677,
+      "rmse_position_error_m": 43.769,
+      "traveled_distance_m": 135.212,
+      "relative_drift_percent": 56.853
+    },
+    "30s": {
+      "final_position_error_m": 230.571,
+      "max_position_error_m": 230.682,
+      "rmse_position_error_m": 130.16,
+      "traveled_distance_m": 416.627,
+      "relative_drift_percent": 54.142
+    },
+    "60s": {
+      "final_position_error_m": 575.533,
+      "max_position_error_m": 577.158,
+      "rmse_position_error_m": 310.61,
+      "traveled_distance_m": 888.17,
+      "relative_drift_percent": 67.166
+    }
+  },
+  "per_session_results": {
+    "S-M": {
+      "5s": {
+        "blackout_intervals": [
+          [
+            2118.0,
+            2123.0
+          ],
+          [
+            4236.0,
+            4241.0
+          ],
+          [
+            6355.0,
+            6360.0
+          ],
+          [
+            8473.0,
+            8478.0
+          ]
+        ],
+        "final_position_error_m": 16.763,
+        "max_position_error_m": 17.325,
+        "rmse_position_error_m": 10.951,
+        "traveled_distance_m": 26.968,
+        "total_traveled_distance_m": 107.873,
+        "relative_drift_percent": 65.327
+      },
+      "10s": {
+        "blackout_intervals": [
+          [
+            2118.0,
+            2128.0
+          ],
+          [
+            4236.0,
+            4246.0
+          ],
+          [
+            6355.0,
+            6365.0
+          ],
+          [
+            8473.0,
+            8483.0
+          ]
+        ],
+        "final_position_error_m": 53.459,
+        "max_position_error_m": 53.459,
+        "rmse_position_error_m": 27.909,
+        "traveled_distance_m": 56.814,
+        "total_traveled_distance_m": 227.256,
+        "relative_drift_percent": 87.313
+      },
+      "30s": {
+        "blackout_intervals": [
+          [
+            2118.0,
+            2148.0
+          ],
+          [
+            4236.0,
+            4266.0
+          ],
+          [
+            6355.0,
+            6385.0
+          ],
+          [
+            8473.0,
+            8503.0
+          ]
+        ],
+        "final_position_error_m": 246.981,
+        "max_position_error_m": 246.981,
+        "rmse_position_error_m": 130.988,
+        "traveled_distance_m": 271.078,
+        "total_traveled_distance_m": 1084.314,
+        "relative_drift_percent": 79.124
+      },
+      "60s": {
+        "blackout_intervals": [
+          [
+            2118.0,
+            2178.0
+          ],
+          [
+            4236.0,
+            4296.0
+          ],
+          [
+            6355.0,
+            6415.0
+          ],
+          [
+            8473.0,
+            8533.0
+          ]
+        ],
+        "final_position_error_m": 682.971,
+        "max_position_error_m": 682.971,
+        "rmse_position_error_m": 355.367,
+        "traveled_distance_m": 694.893,
+        "total_traveled_distance_m": 2779.571,
+        "relative_drift_percent": 94.713
+      }
+    },
+    "S-Vfa01": {
+      "5s": {
+        "blackout_intervals": [
+          [
+            228.0,
+            233.0
+          ],
+          [
+            457.0,
+            462.0
+          ],
+          [
+            685.0,
+            690.0
+          ],
+          [
+            914.0,
+            919.0
+          ]
+        ],
+        "final_position_error_m": 63.575,
+        "max_position_error_m": 63.896,
+        "rmse_position_error_m": 43.277,
+        "traveled_distance_m": 88.728,
+        "total_traveled_distance_m": 354.911,
+        "relative_drift_percent": 72.409
+      },
+      "10s": {
+        "blackout_intervals": [
+          [
+            228.0,
+            238.0
+          ],
+          [
+            457.0,
+            467.0
+          ],
+          [
+            685.0,
+            695.0
+          ],
+          [
+            914.0,
+            924.0
+          ]
+        ],
+        "final_position_error_m": 103.328,
+        "max_position_error_m": 103.328,
+        "rmse_position_error_m": 67.332,
+        "traveled_distance_m": 166.928,
+        "total_traveled_distance_m": 667.713,
+        "relative_drift_percent": 60.364
+      },
+      "30s": {
+        "blackout_intervals": [
+          [
+            228.0,
+            258.0
+          ],
+          [
+            457.0,
+            487.0
+          ],
+          [
+            685.0,
+            715.0
+          ],
+          [
+            914.0,
+            944.0
+          ]
+        ],
+        "final_position_error_m": 249.191,
+        "max_position_error_m": 249.524,
+        "rmse_position_error_m": 152.705,
+        "traveled_distance_m": 432.838,
+        "total_traveled_distance_m": 1731.353,
+        "relative_drift_percent": 57.094
+      },
+      "60s": {
+        "blackout_intervals": [
+          [
+            228.0,
+            288.0
+          ],
+          [
+            457.0,
+            517.0
+          ],
+          [
+            685.0,
+            745.0
+          ],
+          [
+            914.0,
+            974.0
+          ]
+        ],
+        "final_position_error_m": 464.654,
+        "max_position_error_m": 469.529,
+        "rmse_position_error_m": 284.001,
+        "traveled_distance_m": 831.628,
+        "total_traveled_distance_m": 3326.511,
+        "relative_drift_percent": 56.851
+      }
+    },
+    "S-Vw2": {
+      "5s": {
+        "blackout_intervals": [
+          [
+            1053.0,
+            1058.0
+          ],
+          [
+            2106.0,
+            2111.0
+          ],
+          [
+            3159.0,
+            3164.0
+          ],
+          [
+            4212.0,
+            4217.0
+          ]
+        ],
+        "final_position_error_m": 32.177,
+        "max_position_error_m": 32.177,
+        "rmse_position_error_m": 20.481,
+        "traveled_distance_m": 92.889,
+        "total_traveled_distance_m": 371.558,
+        "relative_drift_percent": 24.472
+      },
+      "10s": {
+        "blackout_intervals": [
+          [
+            1053.0,
+            1063.0
+          ],
+          [
+            2106.0,
+            2116.0
+          ],
+          [
+            3159.0,
+            3169.0
+          ],
+          [
+            4212.0,
+            4222.0
+          ]
+        ],
+        "final_position_error_m": 58.211,
+        "max_position_error_m": 58.243,
+        "rmse_position_error_m": 36.065,
+        "traveled_distance_m": 181.893,
+        "total_traveled_distance_m": 727.571,
+        "relative_drift_percent": 22.88
+      },
+      "30s": {
+        "blackout_intervals": [
+          [
+            1053.0,
+            1083.0
+          ],
+          [
+            2106.0,
+            2136.0
+          ],
+          [
+            3159.0,
+            3189.0
+          ],
+          [
+            4212.0,
+            4242.0
+          ]
+        ],
+        "final_position_error_m": 195.54,
+        "max_position_error_m": 195.54,
+        "rmse_position_error_m": 106.786,
+        "traveled_distance_m": 545.963,
+        "total_traveled_distance_m": 2183.852,
+        "relative_drift_percent": 26.208
+      },
+      "60s": {
+        "blackout_intervals": [
+          [
+            1053.0,
+            1113.0
+          ],
+          [
+            2106.0,
+            2166.0
+          ],
+          [
+            3159.0,
+            3219.0
+          ],
+          [
+            4212.0,
+            4272.0
+          ]
+        ],
+        "final_position_error_m": 578.975,
+        "max_position_error_m": 578.975,
+        "rmse_position_error_m": 292.461,
+        "traveled_distance_m": 1137.988,
+        "total_traveled_distance_m": 4551.954,
+        "relative_drift_percent": 49.934
+      }
+    }
+  }
+}

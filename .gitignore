@@ -1,9 +1,52 @@
-.venv/
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter Notebooks
 .ipynb_checkpoints/
-data/raw/
-data/processed/
-models/
-results/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Environment variables & secrets
 .env
+.env.*
+*.pem
+*.key
+credentials.json
+service-account*.json
+
+# Data files (raw dataset & large processed arrays)
+data/raw/
+data/processed/iovnbd_full.npz
+
+# Android & Gradle (for future mobile module)
+.gradle/
+build/
+*/build/
+captures/
+local.properties
+*.apk
+*.aab
+*.aar

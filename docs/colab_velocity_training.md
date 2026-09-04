@@ -95,7 +95,7 @@ Execute training on Colab GPU with deterministic session-wise 80/10/10 split:
 ```bash
 !python src/navigate/train_velocity.py \
     --data "data/processed/iovnbd_full.npz" \
-    --checkpoint "models/velocity_model.pt" \
+    --checkpoint "models/velocity_model_v2.pt" \
     --epochs 50 \
     --batch-size 256 \
     --learning-rate 1e-3 \
@@ -115,7 +115,7 @@ Execute training on Colab GPU with deterministic session-wise 80/10/10 split:
 The training script automatically:
 1. Performs deterministic session partitioning (116 Train / 14 Val / 14 Test sessions).
 2. Normalizes using ONLY training set statistics.
-3. Saves the best checkpoint to `models/velocity_model.pt` based on Validation MSE.
+3. Saves the best checkpoint to `models/velocity_model_v2.pt` based on Validation MSE.
 4. Loads the best checkpoint at the end of training and evaluates the held-out Test set.
 
 Look for the final output report:
@@ -137,5 +137,5 @@ FINAL EVALUATION METRICS:
 Copy the trained model checkpoint to Google Drive:
 
 ```bash
-!cp models/velocity_model.pt "/content/drive/MyDrive/NAVIGATE_2.0/velocity_model.pt"
+!cp models/velocity_model_v2.pt "/content/drive/MyDrive/NAVIGATE_2.0/velocity_model_v2.pt"
 ```

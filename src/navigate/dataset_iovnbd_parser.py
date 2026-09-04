@@ -228,17 +228,23 @@ def load_and_parse_csv(
 
 def fix_timestamp_resets(timestamps: np.ndarray, data: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Detects non-monotonic timestamp resets and sorts/filters data rows to ensure temporal monotonicity.
+    Detects non-monotonic timestamp resets and unwraps timestamps to ensure monotonicity
+    while preserving data row order and alignment with vehicle data.
     """
     if len(timestamps) <= 1:
         return timestamps, data
         
     diffs = np.diff(timestamps)
     if np.any(diffs < 0):
-        logger.warning("Detected non-monotonic timestamp reset. Sorting by timestamp...")
-        sort_idx = np.argsort(timestamps)
-        timestamps = timestamps[sort_idx]
-        data = data[sort_idx]
+        logger.warning("Unwrapping non-monotonic timestamp reset...")
+        unwrapped = timestamps.copy().astype(np.float64)
+        offset = 0.0
+        for i in range(len(diffs)):
+            if diffs[i] < 0:
+                step = diffs[i-1] if (i > 0 and diffs[i-1] > 0) else 100.0
+                offset += (timestamps[i] + step - timestamps[i+1])
+            unwrapped[i + 1] += offset
+        return unwrapped, data
         
     return timestamps, data
 

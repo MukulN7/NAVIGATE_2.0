@@ -104,7 +104,7 @@ def test_timestamp_handling():
     
     clean_ts, clean_data = fix_timestamp_resets(ts_reset, data)
     assert np.all(np.diff(clean_ts) >= 0)
-    assert clean_data[0][0] == 0
+    assert clean_data[0][0] == 1  # Preserves data row order
 
 
 def test_window_creation_50_samples():

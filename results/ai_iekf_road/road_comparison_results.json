@@ -1,0 +1,600 @@
+{
+  "metadata": {
+    "pipeline_version": "Version B: AI + ES-EKF + Road Constraint",
+    "velocity_checkpoint": "models\\velocity_model_v2.pt",
+    "attitude_checkpoint": "models\\attitude_model.pt",
+    "dataset_npz": "data\\processed\\iovnbd_full.npz",
+    "evaluated_sessions": [
+      "S-M",
+      "S-Vfa01",
+      "S-Vw2"
+    ],
+    "blackout_durations_s": [
+      5,
+      10,
+      30,
+      60
+    ],
+    "road_config": {
+      "max_match_dist_m": 20.0,
+      "max_heading_diff_deg": 30.0,
+      "correction_strength": 0.5,
+      "road_cov_m2": 5.0,
+      "lookahead_window_s": 120.0
+    },
+    "road_data_source": "GPS observations strictly before each blackout interval (t < blackout_start), up to lookahead_window_s seconds prior. No future GT is used. Road geometry is frozen at blackout onset.",
+    "leakage_prevention": "Pre-blackout GPS used only (timestamps < blackout_start_s). Cached road polyline is immutable during blackout. EKF road pseudo-measurement uses configurable noise (road_cov_m2). Post-blackout: road cache discarded, normal GNSS fusion resumes.",
+    "limitation": "If vehicle path during blackout diverges from pre-blackout road segment (e.g., turns immediately after outage begins), road constraint may be unhelpful or harmful. Reported via match/rejection statistics.",
+    "runtime_seconds": 121.12
+  },
+  "version_b_overall_by_duration": {
+    "5s": {
+      "final_position_error_m": 20.009,
+      "max_position_error_m": 20.155,
+      "rmse_position_error_m": 12.893,
+      "traveled_distance_m": 69.528,
+      "relative_drift_percent": 38.222,
+      "road_matching": {
+        "intervals_with_road": 12,
+        "total_intervals": 12,
+        "total_steps": 72,
+        "matched": 24,
+        "rejected_distance": 48,
+        "rejected_heading": 0,
+        "match_fraction": 0.3333,
+        "avg_correction_m": 4.239
+      }
+    },
+    "10s": {
+      "final_position_error_m": 41.549,
+      "max_position_error_m": 42.007,
+      "rmse_position_error_m": 24.517,
+      "traveled_distance_m": 135.212,
+      "relative_drift_percent": 39.434,
+      "road_matching": {
+        "intervals_with_road": 12,
+        "total_intervals": 12,
+        "total_steps": 132,
+        "matched": 39,
+        "rejected_distance": 93,
+        "rejected_heading": 0,
+        "match_fraction": 0.2955,
+        "avg_correction_m": 4.434
+      }
+    },
+    "30s": {
+      "final_position_error_m": 157.73,
+      "max_position_error_m": 157.837,
+      "rmse_position_error_m": 86.372,
+      "traveled_distance_m": 416.627,
+      "relative_drift_percent": 45.694,
+      "road_matching": {
+        "intervals_with_road": 12,
+        "total_intervals": 12,
+        "total_steps": 372,
+        "matched": 78,
+        "rejected_distance": 294,
+        "rejected_heading": 0,
+        "match_fraction": 0.2097,
+        "avg_correction_m": 4.772
+      }
+    },
+    "60s": {
+      "final_position_error_m": 385.792,
+      "max_position_error_m": 393.736,
+      "rmse_position_error_m": 212.734,
+      "traveled_distance_m": 888.17,
+      "relative_drift_percent": 56.849,
+      "road_matching": {
+        "intervals_with_road": 12,
+        "total_intervals": 12,
+        "total_steps": 732,
+        "matched": 84,
+        "rejected_distance": 648,
+        "rejected_heading": 0,
+        "match_fraction": 0.1148,
+        "avg_correction_m": 4.818
+      }
+    }
+  },
+  "version_a_comparison": {
+    "5s": {
+      "final_position_error_m": 20.04,
+      "max_position_error_m": 20.186,
+      "rmse_position_error_m": 12.893,
+      "traveled_distance_m": 69.528,
+      "relative_drift_percent": 39.202
+    },
+    "10s": {
+      "final_position_error_m": 41.812,
+      "max_position_error_m": 42.26,
+      "rmse_position_error_m": 24.611,
+      "traveled_distance_m": 135.212,
+      "relative_drift_percent": 42.795
+    },
+    "30s": {
+      "final_position_error_m": 158.143,
+      "max_position_error_m": 158.233,
+      "rmse_position_error_m": 86.588,
+      "traveled_distance_m": 416.627,
+      "relative_drift_percent": 45.984
+    },
+    "60s": {
+      "final_position_error_m": 386.714,
+      "max_position_error_m": 394.651,
+      "rmse_position_error_m": 213.266,
+      "traveled_distance_m": 888.17,
+      "relative_drift_percent": 57.096
+    }
+  },
+  "baseline_comparison": {
+    "5s": {
+      "final_position_error_m": 37.505,
+      "max_position_error_m": 37.799,
+      "rmse_position_error_m": 24.903,
+      "traveled_distance_m": 69.528,
+      "relative_drift_percent": 54.069
+    },
+    "10s": {
+      "final_position_error_m": 71.666,
+      "max_position_error_m": 71.677,
+      "rmse_position_error_m": 43.769,
+      "traveled_distance_m": 135.212,
+      "relative_drift_percent": 56.853
+    },
+    "30s": {
+      "final_position_error_m": 230.571,
+      "max_position_error_m": 230.682,
+      "rmse_position_error_m": 130.16,
+      "traveled_distance_m": 416.627,
+      "relative_drift_percent": 54.142
+    },
+    "60s": {
+      "final_position_error_m": 575.533,
+      "max_position_error_m": 577.158,
+      "rmse_position_error_m": 310.61,
+      "traveled_distance_m": 888.17,
+      "relative_drift_percent": 67.166
+    }
+  },
+  "per_session_results": {
+    "S-M": {
+      "5s": {
+        "blackout_intervals": [
+          [
+            2118.0,
+            2123.0
+          ],
+          [
+            4236.0,
+            4241.0
+          ],
+          [
+            6355.0,
+            6360.0
+          ],
+          [
+            8473.0,
+            8478.0
+          ]
+        ],
+        "final_position_error_m": 17.421,
+        "max_position_error_m": 17.421,
+        "rmse_position_error_m": 10.423,
+        "traveled_distance_m": 26.968,
+        "total_traveled_distance_m": 107.873,
+        "relative_drift_percent": 62.21,
+        "road_matching": {
+          "intervals_with_road": 4,
+          "total_intervals": 4,
+          "total_steps": 24,
+          "matched": 15,
+          "rejected_distance": 9,
+          "rejected_heading": 0,
+          "match_fraction": 0.625,
+          "avg_correction_m": 3.521
+        }
+      },
+      "10s": {
+        "blackout_intervals": [
+          [
+            2118.0,
+            2128.0
+          ],
+          [
+            4236.0,
+            4246.0
+          ],
+          [
+            6355.0,
+            6365.0
+          ],
+          [
+            8473.0,
+            8483.0
+          ]
+        ],
+        "final_position_error_m": 54.054,
+        "max_position_error_m": 54.054,
+        "rmse_position_error_m": 28.27,
+        "traveled_distance_m": 56.814,
+        "total_traveled_distance_m": 227.256,
+        "relative_drift_percent": 76.785,
+        "road_matching": {
+          "intervals_with_road": 4,
+          "total_intervals": 4,
+          "total_steps": 44,
+          "matched": 25,
+          "rejected_distance": 19,
+          "rejected_heading": 0,
+          "match_fraction": 0.5682,
+          "avg_correction_m": 3.865
+        }
+      },
+      "30s": {
+        "blackout_intervals": [
+          [
+            2118.0,
+            2148.0
+          ],
+          [
+            4236.0,
+            4266.0
+          ],
+          [
+            6355.0,
+            6385.0
+          ],
+          [
+            8473.0,
+            8503.0
+          ]
+        ],
+        "final_position_error_m": 263.325,
+        "max_position_error_m": 263.325,
+        "rmse_position_error_m": 136.152,
+        "traveled_distance_m": 271.078,
+        "total_traveled_distance_m": 1084.314,
+        "relative_drift_percent": 96.081,
+        "road_matching": {
+          "intervals_with_road": 4,
+          "total_intervals": 4,
+          "total_steps": 124,
+          "matched": 44,
+          "rejected_distance": 80,
+          "rejected_heading": 0,
+          "match_fraction": 0.3548,
+          "avg_correction_m": 4.413
+        }
+      },
+      "60s": {
+        "blackout_intervals": [
+          [
+            2118.0,
+            2178.0
+          ],
+          [
+            4236.0,
+            4296.0
+          ],
+          [
+            6355.0,
+            6415.0
+          ],
+          [
+            8473.0,
+            8533.0
+          ]
+        ],
+        "final_position_error_m": 765.86,
+        "max_position_error_m": 765.86,
+        "rmse_position_error_m": 393.483,
+        "traveled_distance_m": 694.893,
+        "total_traveled_distance_m": 2779.571,
+        "relative_drift_percent": 117.629,
+        "road_matching": {
+          "intervals_with_road": 4,
+          "total_intervals": 4,
+          "total_steps": 244,
+          "matched": 44,
+          "rejected_distance": 200,
+          "rejected_heading": 0,
+          "match_fraction": 0.1803,
+          "avg_correction_m": 4.413
+        }
+      }
+    },
+    "S-Vfa01": {
+      "5s": {
+        "blackout_intervals": [
+          [
+            228.0,
+            233.0
+          ],
+          [
+            457.0,
+            462.0
+          ],
+          [
+            685.0,
+            690.0
+          ],
+          [
+            914.0,
+            919.0
+          ]
+        ],
+        "final_position_error_m": 30.05,
+        "max_position_error_m": 30.489,
+        "rmse_position_error_m": 20.086,
+        "traveled_distance_m": 88.728,
+        "total_traveled_distance_m": 354.911,
+        "relative_drift_percent": 42.674,
+        "road_matching": {
+          "intervals_with_road": 4,
+          "total_intervals": 4,
+          "total_steps": 24,
+          "matched": 3,
+          "rejected_distance": 21,
+          "rejected_heading": 0,
+          "match_fraction": 0.125,
+          "avg_correction_m": 7.696
+        }
+      },
+      "10s": {
+        "blackout_intervals": [
+          [
+            228.0,
+            238.0
+          ],
+          [
+            457.0,
+            467.0
+          ],
+          [
+            685.0,
+            695.0
+          ],
+          [
+            914.0,
+            924.0
+          ]
+        ],
+        "final_position_error_m": 48.716,
+        "max_position_error_m": 50.046,
+        "rmse_position_error_m": 31.133,
+        "traveled_distance_m": 166.928,
+        "total_traveled_distance_m": 667.713,
+        "relative_drift_percent": 32.735,
+        "road_matching": {
+          "intervals_with_road": 4,
+          "total_intervals": 4,
+          "total_steps": 44,
+          "matched": 3,
+          "rejected_distance": 41,
+          "rejected_heading": 0,
+          "match_fraction": 0.0682,
+          "avg_correction_m": 7.696
+        }
+      },
+      "30s": {
+        "blackout_intervals": [
+          [
+            228.0,
+            258.0
+          ],
+          [
+            457.0,
+            487.0
+          ],
+          [
+            685.0,
+            715.0
+          ],
+          [
+            914.0,
+            944.0
+          ]
+        ],
+        "final_position_error_m": 124.642,
+        "max_position_error_m": 124.642,
+        "rmse_position_error_m": 75.841,
+        "traveled_distance_m": 432.838,
+        "total_traveled_distance_m": 1731.353,
+        "relative_drift_percent": 29.373,
+        "road_matching": {
+          "intervals_with_road": 4,
+          "total_intervals": 4,
+          "total_steps": 124,
+          "matched": 3,
+          "rejected_distance": 121,
+          "rejected_heading": 0,
+          "match_fraction": 0.0242,
+          "avg_correction_m": 7.696
+        }
+      },
+      "60s": {
+        "blackout_intervals": [
+          [
+            228.0,
+            288.0
+          ],
+          [
+            457.0,
+            517.0
+          ],
+          [
+            685.0,
+            745.0
+          ],
+          [
+            914.0,
+            974.0
+          ]
+        ],
+        "final_position_error_m": 268.464,
+        "max_position_error_m": 270.022,
+        "rmse_position_error_m": 155.894,
+        "traveled_distance_m": 831.628,
+        "total_traveled_distance_m": 3326.511,
+        "relative_drift_percent": 31.915,
+        "road_matching": {
+          "intervals_with_road": 4,
+          "total_intervals": 4,
+          "total_steps": 244,
+          "matched": 3,
+          "rejected_distance": 241,
+          "rejected_heading": 0,
+          "match_fraction": 0.0123,
+          "avg_correction_m": 7.696
+        }
+      }
+    },
+    "S-Vw2": {
+      "5s": {
+        "blackout_intervals": [
+          [
+            1053.0,
+            1058.0
+          ],
+          [
+            2106.0,
+            2111.0
+          ],
+          [
+            3159.0,
+            3164.0
+          ],
+          [
+            4212.0,
+            4217.0
+          ]
+        ],
+        "final_position_error_m": 12.555,
+        "max_position_error_m": 12.555,
+        "rmse_position_error_m": 8.17,
+        "traveled_distance_m": 92.889,
+        "total_traveled_distance_m": 371.558,
+        "relative_drift_percent": 9.782,
+        "road_matching": {
+          "intervals_with_road": 4,
+          "total_intervals": 4,
+          "total_steps": 24,
+          "matched": 6,
+          "rejected_distance": 18,
+          "rejected_heading": 0,
+          "match_fraction": 0.25,
+          "avg_correction_m": 0.2
+        }
+      },
+      "10s": {
+        "blackout_intervals": [
+          [
+            1053.0,
+            1063.0
+          ],
+          [
+            2106.0,
+            2116.0
+          ],
+          [
+            3159.0,
+            3169.0
+          ],
+          [
+            4212.0,
+            4222.0
+          ]
+        ],
+        "final_position_error_m": 21.877,
+        "max_position_error_m": 21.921,
+        "rmse_position_error_m": 14.148,
+        "traveled_distance_m": 181.893,
+        "total_traveled_distance_m": 727.571,
+        "relative_drift_percent": 8.782,
+        "road_matching": {
+          "intervals_with_road": 4,
+          "total_intervals": 4,
+          "total_steps": 44,
+          "matched": 11,
+          "rejected_distance": 33,
+          "rejected_heading": 0,
+          "match_fraction": 0.25,
+          "avg_correction_m": 0.183
+        }
+      },
+      "30s": {
+        "blackout_intervals": [
+          [
+            1053.0,
+            1083.0
+          ],
+          [
+            2106.0,
+            2136.0
+          ],
+          [
+            3159.0,
+            3189.0
+          ],
+          [
+            4212.0,
+            4242.0
+          ]
+        ],
+        "final_position_error_m": 85.222,
+        "max_position_error_m": 85.543,
+        "rmse_position_error_m": 47.122,
+        "traveled_distance_m": 545.963,
+        "total_traveled_distance_m": 2183.852,
+        "relative_drift_percent": 11.627,
+        "road_matching": {
+          "intervals_with_road": 4,
+          "total_intervals": 4,
+          "total_steps": 124,
+          "matched": 31,
+          "rejected_distance": 93,
+          "rejected_heading": 0,
+          "match_fraction": 0.25,
+          "avg_correction_m": 0.364
+        }
+      },
+      "60s": {
+        "blackout_intervals": [
+          [
+            1053.0,
+            1113.0
+          ],
+          [
+            2106.0,
+            2166.0
+          ],
+          [
+            3159.0,
+            3219.0
+          ],
+          [
+            4212.0,
+            4272.0
+          ]
+        ],
+        "final_position_error_m": 123.051,
+        "max_position_error_m": 145.327,
+        "rmse_position_error_m": 88.824,
+        "traveled_distance_m": 1137.988,
+        "total_traveled_distance_m": 4551.954,
+        "relative_drift_percent": 21.002,
+        "road_matching": {
+          "intervals_with_road": 4,
+          "total_intervals": 4,
+          "total_steps": 244,
+          "matched": 37,
+          "rejected_distance": 207,
+          "rejected_heading": 0,
+          "match_fraction": 0.1516,
+          "avg_correction_m": 0.683
+        }
+      }
+    }
+  }
+}

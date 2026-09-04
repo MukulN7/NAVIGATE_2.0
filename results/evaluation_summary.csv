@@ -1,0 +1,5 @@
+blackout_duration_s,baseline_final_error_m,ai_iekf_final_error_m,absolute_improvement_m,percentage_improvement_percent,baseline_drift_percent,ai_iekf_drift_percent
+5s,37.505,20.04,17.465,46.57,54.069,39.202
+10s,71.666,41.812,29.854,41.66,56.853,42.795
+30s,230.571,158.143,72.428,31.41,54.142,45.984
+60s,575.533,386.714,188.819,32.81,67.166,57.096

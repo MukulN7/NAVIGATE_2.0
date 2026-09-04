@@ -483,7 +483,7 @@ def train_pipeline(args: argparse.Namespace) -> Dict[str, Optional[float]]:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Train NAVIGATE 2.0 VelocityModel V2 on IO-VNBD")
     p.add_argument("--data", type=str, default="data/processed/iovnbd_smoke_test.npz")
-    p.add_argument("--checkpoint", type=str, default="models/velocity_model.pt")
+    p.add_argument("--checkpoint", type=str, default="models/velocity_model_v2.pt")
     p.add_argument("--epochs", type=int, default=10)
     p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--learning-rate", type=float, default=1e-3)

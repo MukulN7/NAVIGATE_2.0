@@ -1,0 +1,40 @@
+{
+  "evaluation_summary": [
+    {
+      "blackout_duration_s": "5s",
+      "baseline_final_error_m": 37.505,
+      "ai_iekf_final_error_m": 20.04,
+      "absolute_improvement_m": 17.465,
+      "percentage_improvement_percent": 46.57,
+      "baseline_drift_percent": 54.069,
+      "ai_iekf_drift_percent": 39.202
+    },
+    {
+      "blackout_duration_s": "10s",
+      "baseline_final_error_m": 71.666,
+      "ai_iekf_final_error_m": 41.812,
+      "absolute_improvement_m": 29.854,
+      "percentage_improvement_percent": 41.66,
+      "baseline_drift_percent": 56.853,
+      "ai_iekf_drift_percent": 42.795
+    },
+    {
+      "blackout_duration_s": "30s",
+      "baseline_final_error_m": 230.571,
+      "ai_iekf_final_error_m": 158.143,
+      "absolute_improvement_m": 72.428,
+      "percentage_improvement_percent": 31.41,
+      "baseline_drift_percent": 54.142,
+      "ai_iekf_drift_percent": 45.984
+    },
+    {
+      "blackout_duration_s": "60s",
+      "baseline_final_error_m": 575.533,
+      "ai_iekf_final_error_m": 386.714,
+      "absolute_improvement_m": 188.819,
+      "percentage_improvement_percent": 32.81,
+      "baseline_drift_percent": 67.166,
+      "ai_iekf_drift_percent": 57.096
+    }
+  ]
+}
