@@ -11,6 +11,9 @@
     <string name="distance_placeholder">Distance: --</string>
     <string name="eta_placeholder">ETA: --</string>
     <string name="mode_gnss">Mode: GNSS</string>
+    <string name="ekf_status_init">Navigation: INITIALIZING</string>
+    <string name="ekf_status_active">Navigation: ES-EKF ACTIVE</string>
+    <string name="ekf_heading_placeholder">Heading: --°</string>
     <string name="imu_status_init">IMU: Initializing</string>
     <string name="imu_rate_placeholder">Rate: -- Hz</string>
     <string name="ai_status_waiting">AI: Waiting for IMU</string>

@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.location.Location
 import android.os.Bundle
+import android.os.SystemClock
+import android.util.Log
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
@@ -14,9 +16,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import android.os.SystemClock
-import android.util.Log
 import com.sih26168.navigate.databinding.ActivityMainBinding
+import com.sih26168.navigate.helper.EsEkf
+import com.sih26168.navigate.helper.EsEkfMath
 import com.sih26168.navigate.helper.ImuHelper
 import com.sih26168.navigate.helper.LocationHelper
 import com.sih26168.navigate.helper.OnnxInferenceHelper
@@ -38,8 +40,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var locationHelper: LocationHelper
     private lateinit var imuHelper: ImuHelper
     private lateinit var onnxInferenceHelper: OnnxInferenceHelper
+    private val esEkf = EsEkf()
 
-    private val inferenceExecutor = Executors.newSingleThreadExecutor()
+    private val navigationExecutor = Executors.newSingleThreadExecutor()
     private val isInferenceRunning = AtomicBoolean(false)
 
     private var currentGeoPoint: GeoPoint? = null
@@ -51,12 +54,15 @@ class MainActivity : AppCompatActivity() {
 
     private var isMapCenteredOnFirstFix = false
 
-    // AI Inference Diagnostics
+    // Diagnostics & Tracking
     private var lastProcessedSampleCount = -1L
     private var inferenceCount = 0
     private var lastAiRateCalcTimeMs = 0L
     private var currentAiRateHz = 0.0
-    private var lastAiLogTimeMs = 0L
+    private var lastEkfLogTimeMs = 0L
+
+    // Attitude History Buffer for 5-second relative attitude update
+    private val attitudeHistory = mutableListOf<Pair<Double, DoubleArray>>()
 
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
@@ -70,9 +76,12 @@ class MainActivity : AppCompatActivity() {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
         }
-        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
+        window.addFlags(
+            android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                    android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+        )
 
-        // Initialize osmdroid configuration
         val ctx = applicationContext
         Configuration.getInstance().load(ctx, getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
         Configuration.getInstance().userAgentValue = USER_AGENT
@@ -104,79 +113,165 @@ class MainActivity : AppCompatActivity() {
             if (isReady && onnxInferenceHelper.isInitialized()) {
                 val currentSampleCount = imuHelper.imuBuffer.getTotalSampleCount()
                 if (currentSampleCount > lastProcessedSampleCount) {
+                    val countDiff = if (lastProcessedSampleCount < 0) 1 else (currentSampleCount - lastProcessedSampleCount)
                     lastProcessedSampleCount = currentSampleCount
-                    triggerAiInference()
+
+                    // Process 10 Hz IMU propagation & trigger AI inference on background worker
+                    processImuSampleAndInference(countDiff.toInt())
                 }
             }
         }
     }
 
-    private fun triggerAiInference() {
-        if (!isInferenceRunning.compareAndSet(false, true)) {
-            // Drop redundant trigger if previous inference is still executing
-            return
-        }
-
-        val window = imuHelper.imuBuffer.getWindow()
-        if (window.size != 50) {
-            isInferenceRunning.set(false)
-            return
-        }
-
-        inferenceExecutor.execute {
+    private fun processImuSampleAndInference(newSampleCount: Int) {
+        navigationExecutor.execute {
             try {
-                val res = onnxInferenceHelper.runInference(window)
-                val nowMs = SystemClock.elapsedRealtime()
+                val window = imuHelper.imuBuffer.getWindow()
+                if (window.isEmpty()) return@execute
 
-                // Calculate AI Inference Rate (Hz)
-                inferenceCount++
-                if (lastAiRateCalcTimeMs == 0L) {
-                    lastAiRateCalcTimeMs = nowMs
-                } else {
-                    val elapsedMs = nowMs - lastAiRateCalcTimeMs
-                    if (elapsedMs >= 1000L) {
-                        currentAiRateHz = (inferenceCount.toDouble() * 1000.0) / elapsedMs.toDouble()
-                        inferenceCount = 0
-                        lastAiRateCalcTimeMs = nowMs
+                val latestSample = window.last()
+                val nowSec = SystemClock.elapsedRealtime() / 1000.0
+
+                // 1. IMU Propagation & NHC at 10 Hz
+                if (esEkf.isInitialized()) {
+                    val accel = doubleArrayOf(
+                        latestSample[0].toDouble(),
+                        latestSample[1].toDouble(),
+                        latestSample[2].toDouble()
+                    )
+                    val gyro = doubleArrayOf(
+                        latestSample[3].toDouble(),
+                        latestSample[4].toDouble(),
+                        latestSample[5].toDouble()
+                    )
+
+                    // Propagate dt = 0.1s for each new synchronized sample
+                    for (i in 0 until newSampleCount) {
+                        esEkf.predict(0.1, accel, gyro)
+                        esEkf.updateNhc()
+                    }
+
+                    // Store attitude snapshot for relative attitude history
+                    attitudeHistory.add(Pair(nowSec, esEkf.getQuat()))
+                    if (attitudeHistory.size > 100) {
+                        attitudeHistory.removeAt(0)
                     }
                 }
 
-                // Periodic diagnostic logging ~once per second
-                if (nowMs - lastAiLogTimeMs >= 1000L) {
-                    lastAiLogTimeMs = nowMs
-                    Log.d(
-                        "MainActivity",
-                        String.format(
-                            "AI velocity: %.2f m/s | AI quaternion: [%.3f, %.3f, %.3f, %.3f] (norm=%.4f) | AI inference: %.1f Hz | latency: %d ms",
-                            res.speedMs,
-                            res.quaternion[0], res.quaternion[1], res.quaternion[2], res.quaternion[3],
-                            res.quatNorm,
-                            currentAiRateHz,
-                            res.latencyMs
-                        )
-                    )
-                }
+                // 2. Trigger AI Inference if buffer ready
+                if (window.size == 50 && isInferenceRunning.compareAndSet(false, true)) {
+                    try {
+                        val res = onnxInferenceHelper.runInference(window)
+                        val nowMs = SystemClock.elapsedRealtime()
 
-                // Update UI elements on main thread
-                runOnUiThread {
-                    binding.tvAiStatus.text = "AI: Inference ready"
-                    binding.tvAiVelocity.text = String.format("Velocity: %.2f m/s", res.speedMs)
-                    binding.tvAiAttitude.text = String.format(
-                        "Attitude: [%.3f, %.3f, %.3f, %.3f]",
-                        res.quaternion[0], res.quaternion[1], res.quaternion[2], res.quaternion[3]
-                    )
-                    binding.tvAiRate.text = if (currentAiRateHz > 0) {
-                        String.format("Inference rate: %.1f Hz (%d ms)", currentAiRateHz, res.latencyMs)
-                    } else {
-                        String.format("Inference latency: %d ms", res.latencyMs)
+                        inferenceCount++
+                        if (lastAiRateCalcTimeMs == 0L) {
+                            lastAiRateCalcTimeMs = nowMs
+                        } else {
+                            val elapsedMs = nowMs - lastAiRateCalcTimeMs
+                            if (elapsedMs >= 1000L) {
+                                currentAiRateHz = (inferenceCount.toDouble() * 1000.0) / elapsedMs.toDouble()
+                                inferenceCount = 0
+                                lastAiRateCalcTimeMs = nowMs
+                            }
+                        }
+
+                        // Apply AI Velocity & Relative Attitude updates to ES-EKF
+                        if (esEkf.isInitialized()) {
+                            esEkf.updateVelocity(res.speedMs.toDouble())
+
+                            // Find best qStart for 5-second relative attitude window
+                            val targetStartT = nowSec - 5.0
+                            if (attitudeHistory.isNotEmpty()) {
+                                var bestQStart = attitudeHistory[0].second
+                                var minDt = kotlin.math.abs(attitudeHistory[0].first - targetStartT)
+                                for (pair in attitudeHistory) {
+                                    val diffT = kotlin.math.abs(pair.first - targetStartT)
+                                    if (diffT < minDt) {
+                                        minDt = diffT
+                                        bestQStart = pair.second
+                                    }
+                                }
+                                val qRelNet = res.quaternion.map { it.toDouble() }.toDoubleArray()
+                                esEkf.updateRelativeAttitude(qRelNet, bestQStart)
+                            }
+                        }
+
+                        // Periodic diagnostic logging ~once per second
+                        if (nowMs - lastEkfLogTimeMs >= 1000L) {
+                            lastEkfLogTimeMs = nowMs
+                            val posEnu = if (esEkf.isInitialized()) esEkf.getPosEnu() else doubleArrayOf(0.0, 0.0, 0.0)
+                            val velEnu = if (esEkf.isInitialized()) esEkf.getVelEnu() else doubleArrayOf(0.0, 0.0, 0.0)
+
+                            Log.d(
+                                "MainActivity",
+                                String.format(
+                                    "ES-EKF active | pos ENU: [%.2f, %.2f, %.2f] | vel ENU: [%.2f, %.2f, %.2f] | speed: %.2f m/s | heading: %.1f° | GNSS: FIX | AI speed: %.2f m/s | rate: %.1f Hz",
+                                    posEnu[0], posEnu[1], posEnu[2],
+                                    velEnu[0], velEnu[1], velEnu[2],
+                                    if (esEkf.isInitialized()) esEkf.getSpeedMs() else 0.0,
+                                    if (esEkf.isInitialized()) esEkf.getHeadingDeg() else 0.0,
+                                    res.speedMs,
+                                    currentAiRateHz
+                                )
+                            )
+                        }
+
+                        // Update UI on main thread
+                        runOnUiThread {
+                            binding.tvAiStatus.text = "AI: READY"
+                            binding.tvAiVelocity.text = String.format("Velocity: %.2f m/s", if (esEkf.isInitialized()) esEkf.getSpeedMs() else res.speedMs.toDouble())
+                            binding.tvEkfHeading.text = String.format("Heading: %.0f°", if (esEkf.isInitialized()) esEkf.getHeadingDeg() else 0.0)
+                            binding.tvAiAttitude.text = String.format(
+                                "Attitude: [%.3f, %.3f, %.3f, %.3f]",
+                                res.quaternion[0], res.quaternion[1], res.quaternion[2], res.quaternion[3]
+                            )
+                            binding.tvAiRate.text = if (currentAiRateHz > 0) {
+                                String.format("Inference rate: %.1f Hz (%d ms)", currentAiRateHz, res.latencyMs)
+                            } else {
+                                String.format("Inference latency: %d ms", res.latencyMs)
+                            }
+
+                            if (esEkf.isInitialized()) {
+                                updateMapVehicleMarker()
+                            }
+                        }
+
+                    } finally {
+                        isInferenceRunning.set(false)
                     }
                 }
+
             } catch (e: Exception) {
-                Log.e("MainActivity", "Error during AI inference: ${e.message}", e)
-            } finally {
-                isInferenceRunning.set(false)
+                Log.e("MainActivity", "Error in navigation loop: ${e.message}", e)
             }
         }
+    }
+
+    private fun updateMapVehicleMarker() {
+        if (!esEkf.isInitialized()) return
+        val (lat, lon, _) = esEkf.getLatLonAlt()
+        val ekfGeoPoint = GeoPoint(lat, lon)
+        currentGeoPoint = ekfGeoPoint
+
+        if (currentLocationMarker == null) {
+            currentLocationMarker = Marker(binding.mapView).apply {
+                title = "ES-EKF Vehicle Position"
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                position = ekfGeoPoint
+            }
+            binding.mapView.overlays.add(currentLocationMarker)
+        } else {
+            currentLocationMarker?.position = ekfGeoPoint
+        }
+
+        if (!isMapCenteredOnFirstFix) {
+            binding.mapView.controller.animateTo(ekfGeoPoint)
+            binding.mapView.controller.setZoom(16.5)
+            isMapCenteredOnFirstFix = true
+        }
+
+        binding.mapView.invalidate()
     }
 
     private fun setupMapView() {
@@ -184,7 +279,6 @@ class MainActivity : AppCompatActivity() {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
             controller.setZoom(15.0)
-            // Default center fallback (India center)
             controller.setCenter(GeoPoint(20.5937, 78.9629))
         }
     }
@@ -217,27 +311,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleLocationUpdate(location: Location) {
-        val geoPoint = GeoPoint(location.latitude, location.longitude)
-        currentGeoPoint = geoPoint
+        val nowSec = SystemClock.elapsedRealtime() / 1000.0
 
-        if (currentLocationMarker == null) {
-            currentLocationMarker = Marker(binding.mapView).apply {
-                title = "Current Location"
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                position = geoPoint
+        navigationExecutor.execute {
+            if (!esEkf.isInitialized()) {
+                esEkf.initialize(location.latitude, location.longitude, location.altitude, nowSec)
+                Log.d("MainActivity", "ES-EKF Initialized at Lat: ${location.latitude}, Lon: ${location.longitude}")
+            } else {
+                val posEnuMeas = EsEkfMath.latLonToEnu(
+                    location.latitude,
+                    location.longitude,
+                    esEkf.getLatLonAlt().first,
+                    esEkf.getLatLonAlt().second
+                )
+                esEkf.updateGnssPosition(posEnuMeas)
             }
-            binding.mapView.overlays.add(currentLocationMarker)
-        } else {
-            currentLocationMarker?.position = geoPoint
-        }
 
-        if (!isMapCenteredOnFirstFix) {
-            binding.mapView.controller.animateTo(geoPoint)
-            binding.mapView.controller.setZoom(16.5)
-            isMapCenteredOnFirstFix = true
+            runOnUiThread {
+                binding.tvGpsStatus.text = "GNSS: FIX"
+                binding.tvNavigationMode.text = "Navigation: ES-EKF ACTIVE"
+                updateMapVehicleMarker()
+            }
         }
-
-        binding.mapView.invalidate()
     }
 
     private fun performNavigationSearch() {
@@ -260,7 +355,6 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                // 1. Geocode Destination
                 val geocoded = GeocodingService.searchPlace(destText)
                 if (geocoded == null) {
                     binding.progressBar.visibility = View.GONE
@@ -272,7 +366,6 @@ class MainActivity : AppCompatActivity() {
                 val destPoint = GeoPoint(geocoded.latitude, geocoded.longitude)
                 destinationGeoPoint = destPoint
 
-                // Update Destination Marker
                 if (destinationMarker == null) {
                     destinationMarker = Marker(binding.mapView).apply {
                         title = geocoded.displayName
@@ -285,7 +378,6 @@ class MainActivity : AppCompatActivity() {
                     destinationMarker?.position = destPoint
                 }
 
-                // 2. Fetch OSRM Route
                 val routeResult = RoutingService.calculateRoute(startPoint, destPoint)
                 binding.progressBar.visibility = View.GONE
                 binding.btnStartNavigation.isEnabled = true
@@ -295,7 +387,6 @@ class MainActivity : AppCompatActivity() {
                     return@launch
                 }
 
-                // Draw Polyline
                 if (routePolyline != null) {
                     binding.mapView.overlays.remove(routePolyline)
                 }
@@ -308,11 +399,9 @@ class MainActivity : AppCompatActivity() {
                 routePolyline = polyline
                 binding.mapView.overlays.add(polyline)
 
-                // Update UI Status Bar
                 binding.tvRouteDistance.text = "Distance: ${routeResult.getFormattedDistance()}"
                 binding.tvRouteEta.text = "ETA: ${routeResult.getFormattedDuration()}"
 
-                // Zoom Map to Fit Route
                 val boundingBox = BoundingBox.fromGeoPoints(routeResult.points)
                 binding.mapView.zoomToBoundingBox(boundingBox, true, 80)
                 binding.mapView.invalidate()
@@ -379,7 +468,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        inferenceExecutor.shutdown()
+        navigationExecutor.shutdown()
         if (::onnxInferenceHelper.isInitialized) {
             onnxInferenceHelper.close()
         }

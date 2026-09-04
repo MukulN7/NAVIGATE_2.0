@@ -153,10 +153,10 @@
                     android:id="@+id/tvNavigationMode"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/mode_gnss"
-                    android:textColor="@color/text_secondary"
+                    android:text="@string/ekf_status_init"
+                    android:textColor="@color/accent_blue"
                     android:textSize="13sp"
-                    android:textStyle="normal" />
+                    android:textStyle="bold" />
 
             </LinearLayout>
 
@@ -231,29 +231,39 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
+                android:orientation="horizontal"
                 android:layout_marginTop="4dp">
 
                 <TextView
                     android:id="@+id/tvAiVelocity"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:text="@string/ai_velocity_placeholder"
                     android:textColor="@color/text_light"
                     android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/tvAiAttitude"
+                    android:id="@+id/tvEkfHeading"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="@string/ai_attitude_placeholder"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:textStyle="normal" />
+                    android:text="@string/ekf_heading_placeholder"
+                    android:textColor="@color/text_light"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvAiAttitude"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/ai_attitude_placeholder"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textStyle="normal" />
 
             <View
                 android:layout_width="match_parent"
