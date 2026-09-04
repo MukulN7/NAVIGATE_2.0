@@ -1,0 +1,261 @@
+package com.sih26168.navigate
+
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.graphics.Color
+import android.location.Location
+import android.os.Bundle
+import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import com.sih26168.navigate.databinding.ActivityMainBinding
+import com.sih26168.navigate.helper.LocationHelper
+import com.sih26168.navigate.service.GeocodingService
+import com.sih26168.navigate.service.RoutingService
+import kotlinx.coroutines.launch
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
+
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var binding: ActivityMainBinding
+    private lateinit var locationHelper: LocationHelper
+
+    private var currentGeoPoint: GeoPoint? = null
+    private var destinationGeoPoint: GeoPoint? = null
+
+    private var currentLocationMarker: Marker? = null
+    private var destinationMarker: Marker? = null
+    private var routePolyline: Polyline? = null
+
+    private var isMapCenteredOnFirstFix = false
+
+    companion object {
+        private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
+        private const val USER_AGENT = "NAVIGATE_2.0_Android_App/1.0 (com.sih26168.navigate)"
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Initialize osmdroid configuration
+        val ctx = applicationContext
+        Configuration.getInstance().load(ctx, getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
+        Configuration.getInstance().userAgentValue = USER_AGENT
+
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        setupMapView()
+        setupListeners()
+        setupLocationHelper()
+
+        checkLocationPermissions()
+    }
+
+    private fun setupMapView() {
+        binding.mapView.apply {
+            setTileSource(TileSourceFactory.MAPNIK)
+            setMultiTouchControls(true)
+            controller.setZoom(15.0)
+            // Default center fallback (India center)
+            controller.setCenter(GeoPoint(20.5937, 78.9629))
+        }
+    }
+
+    private fun setupListeners() {
+        binding.btnStartNavigation.setOnClickListener {
+            performNavigationSearch()
+        }
+
+        binding.etDestination.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                performNavigationSearch()
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    private fun setupLocationHelper() {
+        locationHelper = LocationHelper(
+            context = this,
+            onLocationUpdated = { location ->
+                handleLocationUpdate(location)
+            },
+            onStatusChanged = { statusText ->
+                binding.tvGpsStatus.text = statusText
+            }
+        )
+    }
+
+    private fun handleLocationUpdate(location: Location) {
+        val geoPoint = GeoPoint(location.latitude, location.longitude)
+        currentGeoPoint = geoPoint
+
+        if (currentLocationMarker == null) {
+            currentLocationMarker = Marker(binding.mapView).apply {
+                title = "Current Location"
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                position = geoPoint
+            }
+            binding.mapView.overlays.add(currentLocationMarker)
+        } else {
+            currentLocationMarker?.position = geoPoint
+        }
+
+        if (!isMapCenteredOnFirstFix) {
+            binding.mapView.controller.animateTo(geoPoint)
+            binding.mapView.controller.setZoom(16.5)
+            isMapCenteredOnFirstFix = true
+        }
+
+        binding.mapView.invalidate()
+    }
+
+    private fun performNavigationSearch() {
+        hideKeyboard()
+
+        val destText = binding.etDestination.text?.toString()?.trim()
+        if (destText.isNullOrEmpty()) {
+            Toast.makeText(this, "Please enter a destination", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val startPoint = currentGeoPoint
+        if (startPoint == null) {
+            Toast.makeText(this, "Acquiring current GPS location... Please wait.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        binding.progressBar.visibility = View.VISIBLE
+        binding.btnStartNavigation.isEnabled = false
+
+        lifecycleScope.launch {
+            try {
+                // 1. Geocode Destination
+                val geocoded = GeocodingService.searchPlace(destText)
+                if (geocoded == null) {
+                    binding.progressBar.visibility = View.GONE
+                    binding.btnStartNavigation.isEnabled = true
+                    Toast.makeText(this@MainActivity, "Destination not found. Try a different address.", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+
+                val destPoint = GeoPoint(geocoded.latitude, geocoded.longitude)
+                destinationGeoPoint = destPoint
+
+                // Update Destination Marker
+                if (destinationMarker == null) {
+                    destinationMarker = Marker(binding.mapView).apply {
+                        title = geocoded.displayName
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        position = destPoint
+                    }
+                    binding.mapView.overlays.add(destinationMarker)
+                } else {
+                    destinationMarker?.title = geocoded.displayName
+                    destinationMarker?.position = destPoint
+                }
+
+                // 2. Fetch OSRM Route
+                val routeResult = RoutingService.calculateRoute(startPoint, destPoint)
+                binding.progressBar.visibility = View.GONE
+                binding.btnStartNavigation.isEnabled = true
+
+                if (routeResult == null || routeResult.points.isEmpty()) {
+                    Toast.makeText(this@MainActivity, "Unable to calculate route. Check internet connection.", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+
+                // Draw Polyline
+                if (routePolyline != null) {
+                    binding.mapView.overlays.remove(routePolyline)
+                }
+
+                val polyline = Polyline().apply {
+                    setPoints(routeResult.points)
+                    outlinePaint.color = Color.parseColor("#2563EB")
+                    outlinePaint.strokeWidth = 12.0f
+                }
+                routePolyline = polyline
+                binding.mapView.overlays.add(polyline)
+
+                // Update UI Status Bar
+                binding.tvRouteDistance.text = "Distance: ${routeResult.getFormattedDistance()}"
+                binding.tvRouteEta.text = "ETA: ${routeResult.getFormattedDuration()}"
+
+                // Zoom Map to Fit Route
+                val boundingBox = BoundingBox.fromGeoPoints(routeResult.points)
+                binding.mapView.zoomToBoundingBox(boundingBox, true, 80)
+                binding.mapView.invalidate()
+
+                Toast.makeText(this@MainActivity, "Route loaded successfully", Toast.LENGTH_SHORT).show()
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                binding.progressBar.visibility = View.GONE
+                binding.btnStartNavigation.isEnabled = true
+                Toast.makeText(this@MainActivity, "Navigation error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun checkLocationPermissions() {
+        val fineLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+        val coarseLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+
+        if (fineLocation != PackageManager.PERMISSION_GRANTED || coarseLocation != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                LOCATION_PERMISSION_REQUEST_CODE
+            )
+        } else {
+            locationHelper.startLocationUpdates()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                locationHelper.startLocationUpdates()
+            } else {
+                binding.tvGpsStatus.text = "Permission Denied"
+                Toast.makeText(this, "Location permission is required for navigation", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun hideKeyboard() {
+        val view = currentFocus ?: binding.root
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(view.windowToken, 0)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        binding.mapView.onResume()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            locationHelper.startLocationUpdates()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        binding.mapView.onPause()
+        locationHelper.stopLocationUpdates()
+    }
+}

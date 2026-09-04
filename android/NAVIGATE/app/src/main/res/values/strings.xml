@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">NAVIGATE</string>
+    <string name="app_title">NAVIGATE</string>
+    <string name="from_current_location">From: Current Location</string>
+    <string name="destination_hint">Enter destination address or city</string>
+    <string name="btn_start_navigation">START NAVIGATION</string>
+    <string name="gps_status_init">Acquiring GPS...</string>
+    <string name="gps_status_active">GPS Active</string>
+    <string name="gps_status_disabled">GPS Disabled</string>
+    <string name="gps_status_denied">Permission Denied</string>
+    <string name="distance_placeholder">Distance: --</string>
+    <string name="eta_placeholder">ETA: --</string>
+    <string name="mode_gnss">Mode: GNSS</string>
+</resources>
