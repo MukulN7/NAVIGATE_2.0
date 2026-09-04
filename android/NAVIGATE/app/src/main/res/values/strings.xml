@@ -11,4 +11,6 @@
     <string name="distance_placeholder">Distance: --</string>
     <string name="eta_placeholder">ETA: --</string>
     <string name="mode_gnss">Mode: GNSS</string>
+    <string name="imu_status_init">IMU: Initializing</string>
+    <string name="imu_rate_placeholder">Rate: -- Hz</string>
 </resources>

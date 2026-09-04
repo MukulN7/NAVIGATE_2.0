@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "com.sih26168.navigate"
     compileSdk = 34
+    buildToolsVersion = "34.0.0"
 
     defaultConfig {
         applicationId = "com.sih26168.navigate"
@@ -45,4 +46,5 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("org.osmdroid:osmdroid-android:6.1.18")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    testImplementation("junit:junit:4.13.2")
 }

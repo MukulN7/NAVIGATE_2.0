@@ -15,6 +15,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.sih26168.navigate.databinding.ActivityMainBinding
+import com.sih26168.navigate.helper.ImuHelper
 import com.sih26168.navigate.helper.LocationHelper
 import com.sih26168.navigate.service.GeocodingService
 import com.sih26168.navigate.service.RoutingService
@@ -30,6 +31,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var locationHelper: LocationHelper
+    private lateinit var imuHelper: ImuHelper
 
     private var currentGeoPoint: GeoPoint? = null
     private var destinationGeoPoint: GeoPoint? = null
@@ -48,6 +50,12 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
+
         // Initialize osmdroid configuration
         val ctx = applicationContext
         Configuration.getInstance().load(ctx, getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
@@ -59,8 +67,18 @@ class MainActivity : AppCompatActivity() {
         setupMapView()
         setupListeners()
         setupLocationHelper()
+        setupImuHelper()
 
         checkLocationPermissions()
+    }
+
+    private fun setupImuHelper() {
+        imuHelper = ImuHelper(this) { statusText, _, sampleRateHz, _ ->
+            runOnUiThread {
+                binding.tvImuStatus.text = statusText
+                binding.tvImuRate.text = if (sampleRateHz > 0) String.format("%.1f Hz", sampleRateHz) else "Rate: -- Hz"
+            }
+        }
     }
 
     private fun setupMapView() {
@@ -251,11 +269,13 @@ class MainActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             locationHelper.startLocationUpdates()
         }
+        imuHelper.start()
     }
 
     override fun onPause() {
         super.onPause()
         binding.mapView.onPause()
         locationHelper.stopLocationUpdates()
+        imuHelper.stop()
     }
 }
