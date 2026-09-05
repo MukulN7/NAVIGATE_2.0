@@ -135,10 +135,20 @@ $$\delta\mathbf{x} = \begin{bmatrix} \delta\mathbf{p}^n & \delta\mathbf{v}^n & \
 where $\delta\mathbf{p}^n$ is position error (3D), $\delta\mathbf{v}^n$ is velocity error (3D), and $\delta\boldsymbol{\theta}^n$ is small-angle orientation error vector (3D).
 
 ### Strapdown Kinematic Integration
+
 High-rate IMU integration propagates the nominal state:
-$$\mathbf{p}_{k+1}^n = \mathbf{p}_k^n + \mathbf{v}_k^n \Delta t + \frac{1}{2} \left( R(\mathbf{q}_k) \mathbf{f}_k^b + \mathbf{g}^n \right) \Delta t^2$$
-$$\mathbf{v}_{k+1}^n = \mathbf{v}_k^n + \left( R(\mathbf{q}_k) \mathbf{f}_k^b + \mathbf{g}^n \right) \Delta t$$
-$$\mathbf{q}_{k+1} = \mathbf{q}_k \otimes \exp\left( \frac{1}{2} \boldsymbol{\omega}_k^b \Delta t \right)$$
+
+$$
+\mathbf{p}_{k+1}^n = \mathbf{p}_k^n + \mathbf{v}_k^n \Delta t + \frac{1}{2} \left( R(\mathbf{q}_k) \mathbf{f}_k^b + \mathbf{g}^n \right) \Delta t^2
+$$
+
+$$
+\mathbf{v}_{k+1}^n = \mathbf{v}_k^n + \left( R(\mathbf{q}_k) \mathbf{f}_k^b + \mathbf{g}^n \right) \Delta t
+$$
+
+$$
+\mathbf{q}_{k+1} = \mathbf{q}_k \otimes \exp\left( \frac{1}{2} \boldsymbol{\omega}_k^b \Delta t \right)
+$$
 
 where $R(\mathbf{q}_k)$ is the rotation matrix from body to ENU frame, and $\mathbf{g}^n = [0, 0, -9.80665]^T$ m/s² is the local gravity vector.
 
