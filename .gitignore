@@ -50,3 +50,8 @@ local.properties
 *.apk
 *.aab
 *.aar
+
+# Temporary debug dumps & logs
+*_logcat.txt
+logcat*.txt
+*.log
