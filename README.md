@@ -66,7 +66,7 @@ NAVIGATE 2.0 processes navigation signals through a progressive multi-layer arch
 ```
 
 ### Layer 1 — Smartphone IMU Acquisition
-Captures high-rate (100–200 Hz) 6-axis raw inertial measurements: 3D specific force from the accelerometer \(\mathbf{f}^b = [f_x, f_y, f_z]^T\) and 3D angular velocity from the gyroscope \(\boldsymbol{\omega}^b = [\omega_x, \omega_y, \omega_z]^T\).
+Captures high-rate (100–200 Hz) 6-axis raw inertial measurements: 3D specific force from the accelerometer $\mathbf{f}^b = [f_x, f_y, f_z]^T$ and 3D angular velocity from the gyroscope $\boldsymbol{\omega}^b = [\omega_x, \omega_y, \omega_z]^T$.
 
 ### Layer 2 — 5-Second Windowing & AI Neural Predictions
 Raw IMU streams are resampled to 10 Hz and windowed into 5-second blocks (50 samples × 6 channels, tensor shape `[B, 50, 6]`) fed into ONNX-exported neural models:
@@ -74,20 +74,20 @@ Raw IMU streams are resampled to 10 Hz and windowed into 5-second blocks (50 sam
 - **CNN + 2-Layer GRU Attitude Model (`AttitudeModel`)**: A sequence model (233,732 parameters) that outputs a relative unit quaternion `[B, 4]` representing **relative orientation / tilt change** over the 5-second window.
 
 ### Layer 3 — 9D Error-State EKF (ES-EKF)
-Integrates high-rate strapdown kinematics for nominal position, velocity, and attitude propagation while maintaining a 9-dimensional error state \(\delta\mathbf{x}\) and \(9 \times 9\) error covariance matrix \(\mathbf{P}\).
+Integrates high-rate strapdown kinematics for nominal position, velocity, and attitude propagation while maintaining a 9-dimensional error state $\delta\mathbf{x}$ and $9 \times 9$ error covariance matrix $\mathbf{P}$.
 
 ### Layer 4 — GNSS Outage Handling & NHC
 When GNSS signal loss occurs:
 1. Direct GNSS position updates are suppressed.
 2. High-rate strapdown propagation continues using IMU kinematics and gravity compensation.
 3. Neural speed predictions update the filter measurement model.
-4. **Non-Holonomic Constraints (NHC)** enforce that ground vehicles cannot move laterally or vertically in the body frame (\(v_{body,y} \approx 0, v_{body,z} \approx 0\)), bounding lateral drift.
+4. **Non-Holonomic Constraints (NHC)** enforce that ground vehicles cannot move laterally or vertically in the body frame ($v_{body,y} \approx 0, v_{body,z} \approx 0$), bounding lateral drift.
 
 ### Layer 5 — Optional Road Topology Constraint
 Extracted road polylines from pre-outage GNSS history act as optional spatial pseudo-measurements. Vehicle position estimates are projected onto candidate road segments if **distance gating (< 20 m)** and **heading agreement (< 30°)** criteria are satisfied.
 
 ### Layer 6 — GNSS Recovery & Re-Fusion
-When satellite signals return, GNSS position fixes \(\mathbf{p}_{GNSS}\) update the EKF error state, resetting accumulated drift and restoring normal navigation fusion.
+When satellite signals return, GNSS position fixes $\mathbf{p}_{GNSS}$ update the EKF error state, resetting accumulated drift and restoring normal navigation fusion.
 
 ---
 
@@ -96,11 +96,11 @@ When satellite signals return, GNSS position fixes \(\mathbf{p}_{GNSS}\) update 
 ### 1. CNN + 2-Layer GRU Velocity Model (`VelocityModel`)
 - **Input Tensor**: `[B, 50, 6]` — 5-second IMU window resampled at 10 Hz (50 samples × 6 channels).
 - **Architecture**:
-  - **Conv1 Block**: `Conv1d(6 -> 128, k=5)` \(\rightarrow\) ReLU \(\rightarrow\) `MaxPool1d(2)` \(\rightarrow\) Dropout1d.
-  - **Conv2 Block**: `Conv1d(128 -> 256, k=3)` \(\rightarrow\) ReLU \(\rightarrow\) `MaxPool1d(2)` \(\rightarrow\) Dropout1d.
-  - **Feature Sequence**: Preserves temporal sequence structure (\(L=10\)) into GRU.
+  - **Conv1 Block**: `Conv1d(6 -> 128, k=5)` → ReLU → `MaxPool1d(2)` → Dropout1d.
+  - **Conv2 Block**: `Conv1d(128 -> 256, k=3)` → ReLU → `MaxPool1d(2)` → Dropout1d.
+  - **Feature Sequence**: Preserves temporal sequence structure ($L=10$) into GRU.
   - **Temporal Sequence Layer**: 2-layer `GRU(in=256, hidden=128, batch_first=True)`.
-  - **Pooling & Head**: Temporal mean pooling over sequence length (\(L=10\)) \(\rightarrow\) Linear(128, 64) \(\rightarrow\) ReLU \(\rightarrow\) Linear(64, 1).
+  - **Pooling & Head**: Temporal mean pooling over sequence length ($L=10$) → Linear(128, 64) → ReLU → Linear(64, 1).
 - **Parameters**: 358,145 trainable parameters (~358k).
 - **Output**: Scalar forward speed prediction `[B, 1]` (in m/s).
 - **ONNX Export**: Saved to [`models/velocity_model_v2.onnx`](models/velocity_model_v2.onnx) *(1.4 MB)* and bundled into Android app assets.
@@ -108,10 +108,10 @@ When satellite signals return, GNSS position fixes \(\mathbf{p}_{GNSS}\) update 
 ### 2. CNN + 2-Layer GRU Attitude Model (`AttitudeModel`)
 - **Input Tensor**: `[B, 50, 6]` — 5-second IMU window resampled at 10 Hz.
 - **Architecture**:
-  - **Conv1 Block**: `Conv1d(6 -> 64, k=5, pad=2)` \(\rightarrow\) BatchNorm \(\rightarrow\) ReLU \(\rightarrow\) `MaxPool1d(2)` \(\rightarrow\) Dropout1d.
-  - **Conv2 Block**: `Conv1d(64 -> 128, k=3, pad=1)` \(\rightarrow\) BatchNorm \(\rightarrow\) ReLU \(\rightarrow\) `MaxPool1d(2)` \(\rightarrow\) Dropout1d.
+  - **Conv1 Block**: `Conv1d(6 -> 64, k=5, pad=2)` → BatchNorm → ReLU → `MaxPool1d(2)` → Dropout1d.
+  - **Conv2 Block**: `Conv1d(64 -> 128, k=3, pad=1)` → BatchNorm → ReLU → `MaxPool1d(2)` → Dropout1d.
   - **Temporal Sequence Layer**: 2-layer `GRU(in=128, hidden=128, batch_first=True)`.
-  - **Pooling & Head**: Temporal mean pooling \(\rightarrow\) Linear(128, 64) \(\rightarrow\) ReLU \(\rightarrow\) Linear(64, 4) \(\rightarrow\) L2 Normalization.
+  - **Pooling & Head**: Temporal mean pooling → Linear(128, 64) → ReLU → Linear(64, 4) → L2 Normalization.
 - **Parameters**: 233,732 trainable parameters (~234k).
 - **Output**: Relative unit quaternion `[B, 4]` (`[qw, qx, qy, qz]`) representing **relative orientation change** over the 5-second window.
 - **ONNX Export**: Saved to [`models/attitude_model.onnx`](models/attitude_model.onnx) *(938 KB)* and bundled into Android app assets.
@@ -125,14 +125,14 @@ The filter maintains a 10D nominal state vector:
 $$\mathbf{x} = \begin{bmatrix} \mathbf{p}^n & \mathbf{v}^n & \mathbf{q}_b^n \end{bmatrix}^T \in \mathbb{R}^{10}$$
 
 where:
-- \(\mathbf{p}^n = [p_E, p_N, p_U]^T\): Position in local East-North-Up (ENU) frame (m)
-- \(\mathbf{v}^n = [v_E, v_N, v_U]^T\): Velocity in local ENU frame (m/s)
-- \(\mathbf{q}_b^n = [q_w, q_x, q_y, q_z]^T\): Orientation unit quaternion from body to ENU frame
+- $\mathbf{p}^n = [p_E, p_N, p_U]^T$: Position in local East-North-Up (ENU) frame (m)
+- $\mathbf{v}^n = [v_E, v_N, v_U]^T$: Velocity in local ENU frame (m/s)
+- $\mathbf{q}_b^n = [q_w, q_x, q_y, q_z]^T$: Orientation unit quaternion from body to ENU frame
 
-The 9D error state \(\delta\mathbf{x}\) and \(9 \times 9\) error covariance matrix \(\mathbf{P}\) are defined as:
+The 9D error state $\delta\mathbf{x}$ and $9 \times 9$ error covariance matrix $\mathbf{P}$ are defined as:
 $$\delta\mathbf{x} = \begin{bmatrix} \delta\mathbf{p}^n & \delta\mathbf{v}^n & \delta\boldsymbol{\theta}^n \end{bmatrix}^T \in \mathbb{R}^{9}$$
 
-where \(\delta\mathbf{p}^n\) is position error (3D), \(\delta\mathbf{v}^n\) is velocity error (3D), and \(\delta\boldsymbol{\theta}^n\) is small-angle orientation error vector (3D).
+where $\delta\mathbf{p}^n$ is position error (3D), $\delta\mathbf{v}^n$ is velocity error (3D), and $\delta\boldsymbol{\theta}^n$ is small-angle orientation error vector (3D).
 
 ### Strapdown Kinematic Integration
 High-rate IMU integration propagates the nominal state:
@@ -140,7 +140,7 @@ $$\mathbf{p}_{k+1}^n = \mathbf{p}_k^n + \mathbf{v}_k^n \Delta t + \frac{1}{2} \l
 $$\mathbf{v}_{k+1}^n = \mathbf{v}_k^n + \left( R(\mathbf{q}_k) \mathbf{f}_k^b + \mathbf{g}^n \right) \Delta t$$
 $$\mathbf{q}_{k+1} = \mathbf{q}_k \otimes \exp\left( \frac{1}{2} \boldsymbol{\omega}_k^b \Delta t \right)$$
 
-where \(R(\mathbf{q}_k)\) is the rotation matrix from body to ENU frame, and \(\mathbf{g}^n = [0, 0, -9.80665]^T\) m/s² is the local gravity vector.
+where $R(\mathbf{q}_k)$ is the rotation matrix from body to ENU frame, and $\mathbf{g}^n = [0, 0, -9.80665]^T$ m/s² is the local gravity vector.
 
 ---
 
